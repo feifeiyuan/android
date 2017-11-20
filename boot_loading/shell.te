@@ -1,0 +1,2 @@
+# 赋予shell域的shell进程读写cpu_total节点的权限
+allow shell cpu_total_file:file { getattr open write read};

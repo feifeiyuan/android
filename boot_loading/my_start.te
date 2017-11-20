@@ -1,0 +1,27 @@
+type my_start, domain;
+type my_start_exec, exec_type, file_type;
+init_daemon_domain(my_start)
+allow my_start shell_exec:file rx_file_perms;
+allow my_start system_file:file { entrypoint read execute};
+allow my_start storage_file:dir {search write read};
+allow my_start rootfs:file { execute_no_trans getattr execute read open};
+allow my_start storage_file:lnk_file {read};
+allow my_start toolbox_exec: file {execute_no_trans open getattr execute read };
+allow my_start tmpfs:dir { search };
+allow my_start mnt_user_file:dir {search open read};
+allow my_start mnt_user_file:lnk_file {read};
+allow my_start fuse:dir {create search open read write add_name remove_name};
+allow my_start fuse:file {create open read write append unlink};
+
+allow my_start my_start:capability {dac_override};
+allow my_start system_data_file:dir {create add_name write open read remove_name};
+allow my_start system_data_file:file {create append open getattr read};
+
+# for read and write cpu_total
+allow my_start cpu_total_file:file { getattr open write read};
+
+#for sh script
+allow my_start sysfs_ipa:file{ write open read getattr};
+allow my_start system_data_file:file { write unlink};
+allow my_start rootfs:dir { open read };
+allow my_start my_start_exec:file{ getattr read open unlink};

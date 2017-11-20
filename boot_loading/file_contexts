@@ -1,0 +1,5 @@
+# 对自创建的文件授予权限,自定义客体类型和名称
+/sys/cpu_loading/cpu_total  u:object_r:my_total_file:s0
+
+# 定制服务启动的权限
+/system/bin/myshell.sh      u:object_r:my_start_exec:s0
