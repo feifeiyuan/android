@@ -1,0 +1,8 @@
+chown root shell /system/bin/myshell.sh
+chmod 0555 /system/bin/myshell.sh
+service my_start /system/bin/myshell.sh
+    class main
+    seclabel u:r:my_start:s0 #在启动之前设置selinux权限,一定需要 
+    user root
+    group root
+    oneshot
