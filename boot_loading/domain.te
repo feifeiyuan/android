@@ -1,0 +1,6 @@
+-neverallow * { file_type -exec_type -postinstall_file }:file entrypoint;
++neverallow { domain -my_start } { file_type -exec_type -postinstall_file }:file entrypoint;
+
+-neverallow { domain -recovery } { system_file exec_type }:dir_file_class_set
++neverallow { domain -recovery -my_start} { system_file exec_type }:dir_file_class_set
+
