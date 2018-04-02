@@ -1,3 +1,4 @@
+# 可以在init.rc中添加也可以在具体模块下添加
 chown root shell /system/bin/myshell.sh
 chmod 0555 /system/bin/myshell.sh
 service my_start /system/bin/myshell.sh
