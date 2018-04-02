@@ -1,0 +1,25 @@
+diff --git a/target/product/base.mk b/target/product/base.mk
+index dae8c0e..f06adab 100644
+--- a/target/product/base.mk
++++ b/target/product/base.mk
+@@ -140,4 +140,4 @@ PRODUCT_COPY_FILES += $(call add-to-product-copy-files-if-exists,\
+ 
+ 
+ $(call inherit-product, $(SRC_TARGET_DIR)/product/embedded.mk)
+-$(call inherit-product, vendor/sprd/tools/ota/device-fotaupdate.mk)
+\ No newline at end of file
++$(call inherit-product, vendor/sprd/tools/ota/device-fotaupdate.mk)
+diff --git a/target/product/core_minimal.mk b/target/product/core_minimal.mk
+index 009ca52..00046e5 100755
+--- a/target/product/core_minimal.mk
++++ b/target/product/core_minimal.mk
+@@ -46,6 +46,7 @@ PRODUCT_PACKAGES += \
+     com.android.mediadrm.signer \
+     com.android.mediadrm.signer.xml \
+     drmserver \
++    cpu_power_cal \
+     ethernet-service \
+     framework-res \
+     idmap \
+#user版本生成的模块需要特殊挂载声明
+#drmserver，一般是必须的，找到他然后类似添加即可
