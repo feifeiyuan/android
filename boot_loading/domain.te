@@ -1,6 +1,19 @@
 -neverallow * { file_type -exec_type -postinstall_file }:file entrypoint;
-+neverallow { domain -my_start } { file_type -exec_type -postinstall_file }:file entrypoint;
++neverallow { domain -my_service } { file_type -exec_type -postinstall_file }:file entrypoint;
 
 -neverallow { domain -recovery } { system_file exec_type }:dir_file_class_set
-+neverallow { domain -recovery -my_start} { system_file exec_type }:dir_file_class_set
++neverallow { domain -recovery -my_service} { system_file exec_type }:dir_file_class_set
 
+-neverallow { domain userdebug_or_eng(`-dumpstate -shell -su') } su_exec:file no_x_file_perms;
++neverallow { domain userdebug_or_eng(`-dumpstate -shell -su -my_service') } su_exec:file no_x_file_perms;
+
+neverallow {
+   domain
++  -my_service
+   -system_server
+   -system_app
+   -init
+   ......
+   
+-neverallow { domain -init -system_server -cmd_services -dumpstate userdebug_or_eng(`-ylog') } debugfs:file no_rw_file_perms;
++neverallow { domain -my_service -init -system_server -cmd_services -dumpstate userdebug_or_eng(`-ylog') } debugfs:file no_rw_file_perms;
