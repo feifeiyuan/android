@@ -18,10 +18,20 @@ allow my_start system_data_file:dir {create add_name write open read remove_name
 allow my_start system_data_file:file {create append open getattr read};
 
 # for read and write cpu_total
-allow my_start cpu_total_file:file { getattr open write read};
+allow my_start node0_file:file { getattr open write read};
+allow my_start node1_file:file { getattr open write read};
+allow my_start node2_file:file { getattr open write read};
+allow my_start node3_file:file { getattr open write read};
 
 #for sh script
 allow my_start sysfs_ipa:file{ write open read getattr};
 allow my_start system_data_file:file { write unlink};
 allow my_start rootfs:dir { open read };
 allow my_start my_start_exec:file{ getattr read open unlink};
+
+#for node0 node1 node2 node3
+allow my_start debugfs:file{ open read getattr };
+allow my_start sysfs:file{ open read getattr };
+
+# for native c
+allow my_start sysfs_devices_system_cpu:file{getattr open read};
