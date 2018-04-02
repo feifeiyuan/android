@@ -1,5 +1,4 @@
 # 对自创建的文件授予权限,自定义客体类型和名称
-type my_total_file, sysfs_type, file_type;
 type node0_file, sysfs_type, file_type;
 type node1_file, sysfs_type, file_type;
 type node2_file, sysfs_type, file_type;
