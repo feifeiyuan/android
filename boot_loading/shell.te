@@ -1,3 +1,5 @@
-
 # 赋予shell域的shell进程读写cpu_total节点的权限
-allow shell cpu_total_file:file { getattr open write read};
+allow shell xxx_file:file { getattr open write read};
+#同理也可以赋予别的域的进程对文件节点的权限
+allow shell xxx_exec:file {getattr open read};
+#这里的文件节点一般是在file_contexts或者...对应的别名
