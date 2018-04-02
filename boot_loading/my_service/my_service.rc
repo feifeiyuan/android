@@ -1,0 +1,8 @@
+chown root shell /system/bin/cpu_power_cal
+chmod 0555 /system/bin/cpu_power_cal
+service cpu_power /system/bin/cpu_power_cal
+    class main
+    seclabel u:r:cpu_power:s0
+    user root
+    group root
+    oneshot
