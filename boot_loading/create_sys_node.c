@@ -4,71 +4,71 @@
 #include <linux/device.h>
 
 static struct kobject *k_obj = NULL;
-static char clusert0_power[20] = {0};
-static char clusert1_power[20] = {0};
-static char clusert2_power[20] = {0};
-static char fcm_power[20] = {0};
+static char node0_buffer[20] = {0};
+static char node1_buffer[20] = {0};
+static char node2_buffer[20] = {0};
+static char node3_buffer[20] = {0};
 
-static ssize_t cluster0_power_show(struct kobject *kobj, struct kobj_attribute *attr, char * buf){
-    return sprintf(buf, "%s", clusert0_power);
+static ssize_t node0_buffer_show(struct kobject *kobj, struct kobj_attribute *attr, char * buf){
+    return sprintf(buf, "%s", node0_buffer);
 }
 
-static ssize_t cluster0_power_store(struct kobject *kobj, struct kobj_attribute *attr, const char * buf, size_t count){
-    sprintf(clusert0_power, "%s", buf);
+static ssize_t node0_buffer_store(struct kobject *kobj, struct kobj_attribute *attr, const char * buf, size_t count){
+    sprintf(node0_buffer, "%s", buf);
     return count;
 }
 
-static ssize_t cluster1_power_show(struct kobject *kobj, struct kobj_attribute *attr, char * buf){
-    return sprintf(buf, "%s", clusert1_power);
+static ssize_t node1_buffer_show(struct kobject *kobj, struct kobj_attribute *attr, char * buf){
+    return sprintf(buf, "%s", node1_buffer);
 }
 
-static ssize_t cluster1_power_store(struct kobject *kobj, struct kobj_attribute *attr, const char * buf, size_t count){
-    sprintf(clusert1_power, "%s", buf);
+static ssize_t node1_buffer_store(struct kobject *kobj, struct kobj_attribute *attr, const char * buf, size_t count){
+    sprintf(node1_buffer, "%s", buf);
     return count;
 }
 
-static ssize_t cluster2_power_show(struct kobject *kobj, struct kobj_attribute *attr, char * buf){
-    return sprintf(buf, "%s", clusert2_power);
+static ssize_t node2_buffer_show(struct kobject *kobj, struct kobj_attribute *attr, char * buf){
+    return sprintf(buf, "%s", node2_buffer);
 }
 
-static ssize_t cluster2_power_store(struct kobject *kobj, struct kobj_attribute *attr, const char * buf, size_t count){
-    sprintf(clusert2_power, "%s", buf);
+static ssize_t node2_buffer_store(struct kobject *kobj, struct kobj_attribute *attr, const char * buf, size_t count){
+    sprintf(node2_buffer, "%s", buf);
     return count;
 }
 
-static ssize_t fcm_power_show(struct kobject *kobj, struct kobj_attribute *attr, char * buf){
-    return sprintf(buf, "%s", fcm_power);
+static ssize_t node3_buffer_show(struct kobject *kobj, struct kobj_attribute *attr, char * buf){
+    return sprintf(buf, "%s", node3_buffer);
 }
 
-static ssize_t fcm_power_store(struct kobject *kobj, struct kobj_attribute *attr, const char * buf, size_t count){
-    sprintf(fcm_power, "%s", buf);
+static ssize_t node3_buffer_store(struct kobject *kobj, struct kobj_attribute *attr, const char * buf, size_t count){
+    sprintf(node3_buffer, "%s", buf);
     return count;
 }
 
-static struct kobj_attribute  cluster0_power_attribute=__ATTR(cluster0_power, S_IWUSR|S_IRUGO, cluster0_power_show, cluster0_power_store);
-static struct kobj_attribute  cluster1_power_attribute=__ATTR(cluster1_power, S_IWUSR|S_IRUGO, cluster1_power_show, cluster1_power_store);
-static struct kobj_attribute  cluster2_power_attribute=__ATTR(cluster2_power, S_IWUSR|S_IRUGO, cluster2_power_show, cluster2_power_store);
-static struct kobj_attribute  fcm_power_attribute=__ATTR(fcm_power, S_IWUSR|S_IRUGO, fcm_power_show, fcm_power_store);
+static struct kobj_attribute  node0_buffer_attribute=__ATTR(node0_buffer, S_IWUSR|S_IRUGO, node0_buffer_show, node0_buffer_store);
+static struct kobj_attribute  node1_buffer_attribute=__ATTR(node1_buffer, S_IWUSR|S_IRUGO, node1_buffer_show, node1_buffer_store);
+static struct kobj_attribute  node2_buffer_attribute=__ATTR(node2_buffer, S_IWUSR|S_IRUGO, node2_buffer_show, node2_buffer_store);
+static struct kobj_attribute  node3_buffer_attribute=__ATTR(node3_buffer, S_IWUSR|S_IRUGO, node3_buffer_show, node3_buffer_store);
 
-static struct attribute *cpu_power_attributes[] = {
-    &cluster0_power_attribute.attr,
-    &cluster1_power_attribute.attr,
-    &cluster2_power_attribute.attr,
-    &fcm_power_attribute.attr,
+static struct attribute *node_attributes[] = {
+    &node0_buffer_attribute.attr,
+    &node1_buffer_attribute.attr,
+    &node2_buffer_attribute.attr,
+    &node3_buffer_attribute.attr,
     NULL
 };
 
-static const struct attribute_group cpu_power_attr_group = {
-    .attrs = cpu_power_attributes,
+static const struct attribute_group node_attr_group = {
+    .attrs = node_attributes,
 };   
 
-static int __init cpu_power_init(void){
-    if ((k_obj = kobject_create_and_add("cpu_power", NULL)) == NULL ) {
-        printk("cpu_power sys node create error \n");
+static int __init node_init(void){
+    if ((k_obj = kobject_create_and_add("my_node", NULL)) == NULL ) {
+        printk("my_node sys node create error \n");
         goto out;
     }
 
-    if(sysfs_create_group(k_obj, &cpu_power_attr_group) ) {
+    if(sysfs_create_group(k_obj, &node_attr_group) ) {
         printk("sysfs_create_group failed\n");
         goto out2;
     }
@@ -80,9 +80,9 @@ out:
     return -1;
 }
 
-static void __exit cpu_power_exit(void){
+static void __exit node_exit(void){
     if (k_obj) {
-        sysfs_remove_group(k_obj, &cpu_power_attr_group);
+        sysfs_remove_group(k_obj, &node_attr_group);
         kobject_put(k_obj);
     }
     return;
