@@ -33,6 +33,7 @@ bool policy_has_boost_freq(struct cpufreq_policy *policy)
 }
 EXPORT_SYMBOL_GPL(policy_has_boost_freq);
 
+// normal return 0
 int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
 				    struct cpufreq_frequency_table *table)
 {
@@ -306,6 +307,7 @@ int cpufreq_table_validate_and_show(struct cpufreq_policy *policy,
 {
 	int ret = cpufreq_frequency_table_cpuinfo(policy, table);
 
+	正常情况下return 0，对policy的freq_table进行初始化
 	if (!ret)
 		policy->freq_table = table;
 

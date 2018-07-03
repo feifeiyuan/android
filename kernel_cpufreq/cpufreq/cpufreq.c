@@ -267,6 +267,7 @@ EXPORT_SYMBOL_GPL(cpufreq_generic_init);
 
 struct cpufreq_policy *cpufreq_cpu_get_raw(unsigned int cpu)
 {
+	// 获取每cpu变量
 	struct cpufreq_policy *policy = per_cpu(cpufreq_cpu_data, cpu);
 
 	return policy && cpumask_test_cpu(cpu, policy->cpus) ? policy : NULL;
@@ -855,6 +856,7 @@ static ssize_t show_affected_cpus(struct cpufreq_policy *policy, char *buf)
 	return cpufreq_show_cpus(policy->cpus, buf);
 }
 
+// clear it
 static ssize_t store_scaling_setspeed(struct cpufreq_policy *policy,
 					const char *buf, size_t count)
 {
@@ -872,7 +874,8 @@ static ssize_t store_scaling_setspeed(struct cpufreq_policy *policy,
 
 	return count;
 }
-
+					
+// clear it
 static ssize_t show_scaling_setspeed(struct cpufreq_policy *policy, char *buf)
 {
 	if (!policy->governor || !policy->governor->show_setspeed)
@@ -1177,10 +1180,14 @@ static struct cpufreq_policy *cpufreq_policy_alloc(unsigned int cpu)
 
 	// 初始化读写信息量
 	init_rwsem(&policy->rwsem);
-	
+
+	// 初始化自旋锁
 	spin_lock_init(&policy->transition_lock);
+	
 	init_waitqueue_head(&policy->transition_wait);
 	init_completion(&policy->kobj_unregister);
+
+	// 初始化工作队列并绑定处理函数，handle_update
 	INIT_WORK(&policy->update, handle_update);
 
 	policy->cpu = cpu;
@@ -1350,14 +1357,16 @@ static int cpufreq_online(unsigned int cpu)
 	cpumask_and(policy->cpus, policy->cpus, cpu_online_mask);
 
 	if (new_policy) {
-		// 创建new_policy的时候将related的cpu一并创建
+		
 		policy->user_policy.min = policy->min;
 		policy->user_policy.max = policy->max;
 
 		write_lock_irqsave(&cpufreq_driver_lock, flags);
+		// 创建new_policy的时候将related的cpu一并创建，只会对online的一起创建
 		for_each_cpu(j, policy->related_cpus)
 			per_cpu(cpufreq_cpu_data, j) = policy;
 		write_unlock_irqrestore(&cpufreq_driver_lock, flags);
+		
 	} else {
 		policy->min = policy->user_policy.min;
 		policy->max = policy->user_policy.max;
@@ -1426,6 +1435,7 @@ static int cpufreq_online(unsigned int cpu)
 		write_unlock_irqrestore(&cpufreq_driver_lock, flags);
 	}
 
+	// 初始化policy
 	ret = cpufreq_init_policy(policy);
 	if (ret) {
 		pr_err("%s: Failed to initialize policy for cpu: %d (%d)\n",
@@ -1462,7 +1472,7 @@ out_free_policy:
  * @dev: CPU device.
  * @sif: Subsystem(子系统) interface structure pointer (not used)
  */
- // 实际上就是每个cpu对应的policy
+ // 实际上就是每个cpu对应的policy，实际上会遍历每个cpu来调用该函数
 static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 {
 	unsigned cpu = dev->id;
@@ -1475,20 +1485,23 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 	if (cpu_online(cpu)) {
 		ret = cpufreq_online(cpu);
 	} else {
+		// 针对的是offline的cpu
 		/*
 		 * A hotplug notifier(通知) will follow and we will handle it as CPU
 		 * online then.  For now, just create the sysfs link, unless
 		 * there is no policy or the link is already present.
 		 */
 		 // SMP系统中，一个policy可以管理多个cpu，如果管理cpu创建policy的时候一并创建，后续就只需建立连接
+		 // cpufreq_cpu_data实际上是cpufreq_policy的指针
 		struct cpufreq_policy *policy = per_cpu(cpufreq_cpu_data, cpu);
 
-		ret = policy && !cpumask_test_and_set_cpu(cpu, policy->real_cpus)
+		ret = policy && !cpumask_test_and_set_cpu(cpu, policy->real_cpus)//取非表示在新的位图中
 			? add_cpu_dev_symlink(policy, cpu) : 0;
 	}
 
 	return ret;
 }
+
 
 static void cpufreq_offline_prepare(unsigned int cpu)
 {
@@ -1496,29 +1509,38 @@ static void cpufreq_offline_prepare(unsigned int cpu)
 
 	pr_debug("%s: unregistering CPU %u\n", __func__, cpu);
 
+	// 检查policy是否存在于cpu上，如果存在则实现拷贝，这个是轻量级的cpufreq_get_cpu
+	// 因为不需要上锁和执行kobject实现文件更新
 	policy = cpufreq_cpu_get_raw(cpu);
 	if (!policy) {
 		pr_debug("%s: No cpu_data found\n", __func__);
 		return;
 	}
 
+	// arm:patch +
+	//down_write(&policy->rwsem);
 	if (has_target()) {
+		// stop governor
 		int ret = __cpufreq_governor(policy, CPUFREQ_GOV_STOP);
 		if (ret)
 			pr_err("%s: Failed to stop governor\n", __func__);
 	}
 
+	// arm:patch -
 	down_write(&policy->rwsem);
 	cpumask_clear_cpu(cpu, policy->cpus);
 
 	if (policy_is_inactive(policy)) {
 		if (has_target())
-			strncpy(policy->last_governor, policy->governor->name,
-				CPUFREQ_NAME_LEN);
+			// name 一般不超过16个字符
+			strncpy(policy->last_governor, policy->governor->name, CPUFREQ_NAME_LEN);
 		else
 			policy->last_policy = policy->policy;
+		
+	// offline的是管理cpu
 	} else if (cpu == policy->cpu) {
 		/* Nominate new CPU */
+		// nominate 是提名，需要将当前的policy给别的cpu管理
 		policy->cpu = cpumask_any(policy->cpus);
 	}
 	up_write(&policy->rwsem);
@@ -1540,6 +1562,7 @@ static void cpufreq_offline_prepare(unsigned int cpu)
 
 static void cpufreq_offline_finish(unsigned int cpu)
 {
+	// 存取另外一个cpu上的每cpu变量
 	struct cpufreq_policy *policy = per_cpu(cpufreq_cpu_data, cpu);
 
 	if (!policy) {
@@ -1579,11 +1602,13 @@ static void cpufreq_offline_finish(unsigned int cpu)
 static void cpufreq_remove_dev(struct device *dev, struct subsys_interface *sif)
 {
 	unsigned int cpu = dev->id;
+	
 	struct cpufreq_policy *policy = per_cpu(cpufreq_cpu_data, cpu);
 
 	if (!policy)
 		return;
 
+	// 将cpu的cpufreq remove
 	if (cpu_online(cpu)) {
 		cpufreq_offline_prepare(cpu);
 		cpufreq_offline_finish(cpu);
@@ -1598,8 +1623,9 @@ static void cpufreq_remove_dev(struct device *dev, struct subsys_interface *sif)
 
 static void handle_update(struct work_struct *work)
 {
-	struct cpufreq_policy *policy =
-		container_of(work, struct cpufreq_policy, update);
+	struct cpufreq_policy *policy = container_of(work, struct cpufreq_policy, update);
+	
+	// 获取管理policy的cpu
 	unsigned int cpu = policy->cpu;
 	pr_debug("handle_update for cpu %u called\n", cpu);
 	cpufreq_update_policy(cpu);
@@ -1660,6 +1686,7 @@ EXPORT_SYMBOL(cpufreq_quick_get);
  *
  * Just return the max possible frequency for a given CPU.
  */
+ // 最大值是软件特性上的最大值
 unsigned int cpufreq_quick_get_max(unsigned int cpu)
 {
 	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
@@ -1674,6 +1701,7 @@ unsigned int cpufreq_quick_get_max(unsigned int cpu)
 }
 EXPORT_SYMBOL(cpufreq_quick_get_max);
 
+// 获取policy的目标freq
 unsigned int cpufreq_quick_get_target(unsigned int cpu)
 {
 	struct cpufreq_policy *policy;
@@ -1687,6 +1715,7 @@ unsigned int cpufreq_quick_get_target(unsigned int cpu)
 
 	return ret_freq;
 }
+
 EXPORT_SYMBOL(cpufreq_quick_get_target);
 
 static unsigned int __cpufreq_get(struct cpufreq_policy *policy)
@@ -1696,6 +1725,7 @@ static unsigned int __cpufreq_get(struct cpufreq_policy *policy)
 	if (!cpufreq_driver->get)
 		return ret_freq;
 
+	// 从硬件获取当前freq
 	ret_freq = cpufreq_driver->get(policy->cpu);
 
 	/* Updating inactive policies is invalid, so avoid doing that. */
@@ -1704,7 +1734,7 @@ static unsigned int __cpufreq_get(struct cpufreq_policy *policy)
 
 	if (ret_freq && policy->cur &&
 		!(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) {
-		/* verify no discrepancy between actual and
+		/* verify no discrepancy(差异) between actual and
 					saved value exists */
 		if (unlikely(ret_freq != policy->cur)) {
 			cpufreq_out_of_sync(policy, ret_freq);
@@ -1741,6 +1771,7 @@ EXPORT_SYMBOL(cpufreq_get);
 static struct subsys_interface cpufreq_interface = {
 	.name		= "cpufreq",
 	.subsys		= &cpu_subsys,
+	// 调用add_dev函数开始为每个cpu添加cpufreq节点
 	.add_dev	= cpufreq_add_dev,
 	.remove_dev	= cpufreq_remove_dev,
 };
@@ -2222,6 +2253,7 @@ static int __cpufreq_governor(struct cpufreq_policy *policy,
 	return ret;
 }
 
+//将governor注册到cpufreq core中之后才能通过policy的governor和policy相互关联，才能被使用
 int cpufreq_register_governor(struct cpufreq_governor *governor)
 {
 	int err;
@@ -2232,12 +2264,15 @@ int cpufreq_register_governor(struct cpufreq_governor *governor)
 	if (cpufreq_disabled())
 		return -ENODEV;
 
+	// mutex互斥体用来保护较长的临界区
 	mutex_lock(&cpufreq_governor_mutex);
 
 	governor->initialized = 0;
 	err = -EBUSY;
 	if (!find_governor(governor->name)) {
 		err = 0;
+		// 将governor添加到governor的list里面去
+		// 核心层定义了一个全局链表变量，cpufreq_governor_list
 		list_add(&governor->governor_list, &cpufreq_governor_list);
 	}
 
@@ -2431,7 +2466,7 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 }
 
 /**
- *	cpufreq_update_policy - re-evaluate an existing cpufreq policy
+ *	cpufreq_update_policy - re-evaluate(评估) an existing cpufreq policy
  *	@cpu: CPU which shall be re-evaluated
  *
  *	Useful for policy notifiers which have different necessities
@@ -2439,6 +2474,7 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
  */
 int cpufreq_update_policy(unsigned int cpu)
 {
+	// cpufreq_cpu_get里面应该有上锁操作
 	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
 	struct cpufreq_policy new_policy;
 	int ret;
@@ -2482,6 +2518,7 @@ int cpufreq_update_policy(unsigned int cpu)
 unlock:
 	up_write(&policy->rwsem);
 
+	// 应该有通知不能被抢占
 	cpufreq_cpu_put(policy);
 	return ret;
 }
@@ -2570,7 +2607,6 @@ int cpufreq_boost_trigger_state(int state)
 
 int cpufreq_boost_supported(void)
 {
-	// 也就是说一般是支持的
 	if (likely(cpufreq_driver))
 		return cpufreq_driver->boost_supported;
 
@@ -2578,6 +2614,8 @@ int cpufreq_boost_supported(void)
 }
 EXPORT_SYMBOL_GPL(cpufreq_boost_supported);
 
+// /sys/devices/system/cpu/cpufreq # cat boost
+// 里面的值是1或者是0
 static int create_boost_sysfs_file(void)
 {
 	int ret;
@@ -2589,6 +2627,7 @@ static int create_boost_sysfs_file(void)
 	 * Check if driver provides function to enable boost -
 	 * if not, use cpufreq_boost_set_sw as default
 	 */
+	 // set boost就是设置boost的接口
 	if (!cpufreq_driver->set_boost)
 		cpufreq_driver->set_boost = cpufreq_boost_set_sw;
 
@@ -2641,6 +2680,8 @@ EXPORT_SYMBOL_GPL(cpufreq_boost_enabled);
  * (and isn't unregistered in the meantime).
  *
  */
+ // 只存在一个cpufreq
+ // 只负责知道如何控制该平台的时钟系统，从而设定由governor确定的工作频率
 int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 {
 	unsigned long flags;
@@ -2664,18 +2705,22 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 
 	// 读写自旋锁，同时保存中断状态
 	write_lock_irqsave(&cpufreq_driver_lock, flags);
-	// 系统只能有一个cpufreq_driver
+	
+	// 系统只能有一个cpufreq_driver，所以检测全局变量cpufreq_driver是否被赋值
 	if (cpufreq_driver) {
 		write_unlock_irqrestore(&cpufreq_driver_lock, flags);
 		ret = -EEXIST;
+		// 如果已经注册了cpufreq则退出
 		goto out;
 	}
+	// 如果没有，则将cpufreq_data赋值给他
 	cpufreq_driver = driver_data;
 	write_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
 	if (driver_data->setpolicy)
 		driver_data->flags |= CPUFREQ_CONST_LOOPS;
 
+	// 创建/sys/devices/system/cpu/cpufreq # cat boost节点
 	ret = create_boost_sysfs_file();
 	if (ret)
 		goto err_null_driver;
@@ -2734,17 +2779,16 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 
 	pr_debug("unregistering driver %s\n", driver->name);
 
-	/* Protect against concurrent cpu hotplug */
+	/* Protect against concurrent(同时) cpu hotplug */
 	get_online_cpus();
 	subsys_interface_unregister(&cpufreq_interface);
 	remove_boost_sysfs_file();
 	unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
 
 	write_lock_irqsave(&cpufreq_driver_lock, flags);
-
 	cpufreq_driver = NULL;
-
 	write_unlock_irqrestore(&cpufreq_driver_lock, flags);
+
 	put_online_cpus();
 
 	return 0;
@@ -2763,6 +2807,7 @@ static struct syscore_ops cpufreq_syscore_ops = {
 struct kobject *cpufreq_global_kobject;
 EXPORT_SYMBOL(cpufreq_global_kobject);
 
+// coufreq core的初始化
 static int __init cpufreq_core_init(void)
 {
 	// cpufreq_diabled返回的是off这个变量的值
@@ -2770,6 +2815,9 @@ static int __init cpufreq_core_init(void)
 		return -ENODEV;
 	
 	//后面一个参数可以挂载到具体的路劲，如果为NULL则在sys下面
+	//具体的挂载到/sys/devices/system/cpu/cpufreq下
+	//参数cpu_subsys是内核的一个全局变量，是由更早期的初始化时初始化的，代码在drivers/base/cpu.c中：
+	// cpufreq通过cpu_subsys获取cpu下对应的每个cpu，并建立对应的cpufreq的链接
 	cpufreq_global_kobject = kobject_create_and_add("cpufreq", &cpu_subsys.dev_root->kobj);
 	BUG_ON(!cpufreq_global_kobject);
 
