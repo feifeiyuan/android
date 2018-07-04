@@ -178,7 +178,7 @@ static struct cpufreq_driver dummy_cpufreq_driver = {
 	.attr = cpufreq_dummy_attr,
 };
 
-static int sprd_dummy_cpufreq_probe(struct platform_device *pdev)
+static int xxx_dummy_cpufreq_probe(struct platform_device *pdev)
 {
 	int ret;
 
@@ -188,33 +188,33 @@ static int sprd_dummy_cpufreq_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int sprd_dummy_cpufreq_remove(struct platform_device *pdev)
+static int xxx_dummy_cpufreq_remove(struct platform_device *pdev)
 {
 	cpufreq_unregister_driver(&dummy_cpufreq_driver);
 	return 0;
 }
 
-static struct platform_driver sprd_dummy_cpufreq_platdrv = {
+static struct platform_driver xxx_dummy_cpufreq_platdrv = {
 	.driver = {
 		.name	= "dummy-cpufreq",
 	},
-	.probe		= sprd_dummy_cpufreq_probe,
-	.remove		= sprd_dummy_cpufreq_remove,
+	.probe		= xxx_dummy_cpufreq_probe,
+	.remove		= xxx_dummy_cpufreq_remove,
 };
 
-module_platform_driver(sprd_dummy_cpufreq_platdrv);
+module_platform_driver(xxx_dummy_cpufreq_platdrv);
 
-static struct platform_device sprd_dummy_cpufreq_pdev = {
+static struct platform_device xxx_dummy_cpufreq_pdev = {
 	.name = "dummy-cpufreq",
 };
 
-static int  __init sprd_dummy_cpufreq_init_pdev(void)
+static int  __init xxx_dummy_cpufreq_init_pdev(void)
 {
-	return platform_device_register(&sprd_dummy_cpufreq_pdev);
+	return platform_device_register(&xxx_dummy_cpufreq_pdev);
 }
 
-device_initcall(sprd_dummy_cpufreq_init_pdev);
+device_initcall(xxx_dummy_cpufreq_init_pdev);
 
-MODULE_ALIAS("platform:sprd_dummy_driver");
-MODULE_DESCRIPTION("sprd dummy cpufreq driver");
+MODULE_ALIAS("platform:xxx_dummy_driver");
+MODULE_DESCRIPTION("xxx dummy cpufreq driver");
 MODULE_LICENSE("GPL");

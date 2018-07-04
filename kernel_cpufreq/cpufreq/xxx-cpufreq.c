@@ -24,10 +24,10 @@
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/types.h>
-#include <linux/sprd_otp.h>
+#include <linux/xxx_otp.h>
 #include <linux/of_platform.h>
-#include <linux/sprd-cpufreq.h>
-#include <linux/sprd-cpufreqhw.h>
+#include <linux/xxx-cpufreq.h>
+#include <linux/xxx-cpufreqhw.h>
 
 
 #ifdef P_DBG
@@ -77,15 +77,15 @@
 #define SPRD_CPUFREQ_DRV_BOOST_DURATOIN	(60ul*HZ)
 
 //topology_physical_package_id 返回值是0或者是1
-#define sprd_cpufreq_data(cpu) \
+#define xxx_cpufreq_data(cpu) \
 	cpufreq_datas[topology_physical_package_id(cpu)]
 #define is_big_cluster(cpu) (topology_physical_package_id(cpu) != 0)
 
-struct sprd_cpufreq_group {
+struct xxx_cpufreq_group {
 	unsigned long freq;/*HZ*/
 	unsigned long volt;/*uV*/
 };
-struct sprd_cpufreq_driver_data {
+struct xxx_cpufreq_driver_data {
 	unsigned int cluster;
 	unsigned int online;
 	struct mutex *volt_lock;
@@ -118,7 +118,7 @@ struct sprd_cpufreq_driver_data {
 	unsigned int freqvolts;
 
 	/*max freq is on freqvolt[0]*/
-	struct sprd_cpufreq_group
+	struct xxx_cpufreq_group
 		freqvolt[SPRD_CPUFREQ_MAX_FREQ_VOLT];
 	unsigned int temp_max_freq;
 	int temp_list[SPRD_CPUFREQ_MAX_TEMP];
@@ -129,14 +129,14 @@ struct sprd_cpufreq_driver_data {
 	unsigned long temp_fall_time;
 };
 
-static struct sprd_cpufreq_driver_data *cpufreq_datas[SPRD_CPUFREQ_MAX_MODULE];
+static struct xxx_cpufreq_driver_data *cpufreq_datas[SPRD_CPUFREQ_MAX_MODULE];
 
 static unsigned long boot_done_timestamp;
 static int boost_mode_flag = 1;
-static struct cpufreq_driver sprd_cpufreq_driver;
-static int sprd_cpufreq_set_boost(int state);
-static int sprd_cpufreq_set_target(
-	struct sprd_cpufreq_driver_data *cpufreq_data,
+static struct cpufreq_driver xxx_cpufreq_driver;
+static int xxx_cpufreq_set_boost(int state);
+static int xxx_cpufreq_set_target(
+	struct xxx_cpufreq_driver_data *cpufreq_data,
 	unsigned int idx, bool force);
 
 static int efuse_uid_waferid_get(struct device *dev,
@@ -153,15 +153,15 @@ static int efuse_uid_waferid_get(struct device *dev,
 	}
 
 	if (dev && !of_node_get(dev->of_node)) {
-		dev_info(dev, "sprd_cpufreq: %s not found cpu node\n", __func__);
+		dev_info(dev, "xxx_cpufreq: %s not found cpu node\n", __func__);
 		return -ENOENT;
 	}
 
 	if (dev)
 		prop = of_find_property(dev->of_node,
-			"sprd,ss-waferid-names", NULL);
+			"xxx,ss-waferid-names", NULL);
 	prop1 = of_find_property(np_cpufreq_data,
-		"sprd,ss-waferid-names", NULL);
+		"xxx,ss-waferid-names", NULL);
 
 	if (!prop && !prop1)
 		return -ENODEV;
@@ -175,7 +175,7 @@ static int efuse_uid_waferid_get(struct device *dev,
 		dn_cpufreq_data = np_cpufreq_data;
 
 	memset(uid, 0, sizeof(uid));
-	sprd_get_chip_uid(uid);
+	xxx_get_chip_uid(uid);
 	/*find second '_', and set 0, strcpy(uid, "T8F465_9_12_28");*/
 	p1 = strchr(uid, '_');
 	if (!p1)
@@ -186,7 +186,7 @@ static int efuse_uid_waferid_get(struct device *dev,
 		return -ENODATA;
 	*p2 = 0;
 	if (of_property_match_string(dn_cpufreq_data,
-				"sprd,ss-waferid-names", uid) >= 0) {
+				"xxx,ss-waferid-names", uid) >= 0) {
 		*p_binning_data = 3;
 	} else {
 		*p_binning_data = 4;
@@ -213,14 +213,14 @@ static int efuse_binning_low_volt_get(struct device *dev,
 
 	cpu_np = of_node_get(dev->of_node);
 	if (!cpu_np) {
-		dev_info(dev, "sprd_cpufreq: efuse_binning_get failed to find cpu node\n");
+		dev_info(dev, "xxx_cpufreq: efuse_binning_get failed to find cpu node\n");
 		return -ENOENT;
 	}
 
 	prop = of_find_property(dev->of_node,
-					"sprd,efuse-blk-binning-low-volt", NULL);
+					"xxx,efuse-blk-binning-low-volt", NULL);
 	prop1 = of_find_property(np_cpufreq_data,
-					"sprd,efuse-blk-binning-low-volt", NULL);
+					"xxx,efuse-blk-binning-low-volt", NULL);
 	if (!prop && !prop1)
 		return -ENODEV;
 	if (prop && !prop->value)
@@ -231,7 +231,7 @@ static int efuse_binning_low_volt_get(struct device *dev,
 		prop = prop1;
 
 	if (prop->length  != (2*sizeof(u32))) {
-		dev_err(dev, "sprd_cpufreq: %s: Invalid efuse_blk_binning(prop->length %d)\n",
+		dev_err(dev, "xxx_cpufreq: %s: Invalid efuse_blk_binning(prop->length %d)\n",
 				__func__, prop->length);
 		return -EINVAL;
 	}
@@ -240,12 +240,12 @@ static int efuse_binning_low_volt_get(struct device *dev,
 	efuse_blk_binning_bits = be32_to_cpup(val);
 	nLSB = __ffs(efuse_blk_binning_bits);
 
-	efuse_blk_binning_data = sprd_efuse_double_read(efuse_blk_binning, 1);
+	efuse_blk_binning_data = xxx_efuse_double_read(efuse_blk_binning, 1);
 	efuse_blk_binning_data = efuse_blk_binning_data & efuse_blk_binning_bits;
 	if (nLSB != 0) {
 		efuse_blk_binning_data = efuse_blk_binning_data>>nLSB;
 	}
-	dev_info(dev, "sprd_cpufreq: blk 0x%x, bits 0x%x, nLSB %d, BIN %u\n",
+	dev_info(dev, "xxx_cpufreq: blk 0x%x, bits 0x%x, nLSB %d, BIN %u\n",
 			efuse_blk_binning, efuse_blk_binning_bits,
 			nLSB, efuse_blk_binning_data);
 	if (efuse_blk_binning_data == 0) {
@@ -275,16 +275,16 @@ struct device_node *np_cpufreq_data, u32 *p_binning_data)
 	}
 
 	if (dev && !of_node_get(dev->of_node)) {
-		dev_info(dev, "sprd_cpufreq: %s not found cpu node\n",
+		dev_info(dev, "xxx_cpufreq: %s not found cpu node\n",
 			__func__);
 		return -ENOENT;
 	}
 
 	if (dev)
 		prop = of_find_property(dev->of_node,
-			"sprd,efuse-blk-binning", NULL);
+			"xxx,efuse-blk-binning", NULL);
 	prop1 = of_find_property(np_cpufreq_data,
-					"sprd,efuse-blk-binning", NULL);
+					"xxx,efuse-blk-binning", NULL);
 	if (!prop && !prop1)
 		return -ENODEV;
 	if (prop && !prop->value)
@@ -305,9 +305,9 @@ struct device_node *np_cpufreq_data, u32 *p_binning_data)
 	nLSB = __ffs(efuse_blk_binning_bits);
 
 #if defined(CONFIG_OTP_SPRD_AP_EFUSE) || defined(CONFIG_OTP_SPRD_AP_IEFUSE)
-	efuse_blk_binning_data = sprd_ap_efuse_read(efuse_blk_binning);
+	efuse_blk_binning_data = xxx_ap_efuse_read(efuse_blk_binning);
 #elif defined(CONFIG_OTP_SPRD_AP_PUBLIC_EFUSE)
-	efuse_blk_binning_data = sprd_efuse_double_read(efuse_blk_binning, 1);
+	efuse_blk_binning_data = xxx_efuse_double_read(efuse_blk_binning, 1);
 #else
 	efuse_blk_binning_data = 0;
 #endif
@@ -331,7 +331,7 @@ struct device_node *np_cpufreq_data, u32 *p_binning_data)
 
 static int temp_binning_get(struct device *dev,
 	struct device_node *np_cpufreq_data,
-	struct sprd_cpufreq_driver_data *cpufreq_data,
+	struct xxx_cpufreq_driver_data *cpufreq_data,
 	char *opp_temp)
 {
 	const struct property *prop = NULL, *prop1 = NULL;
@@ -348,16 +348,16 @@ static int temp_binning_get(struct device *dev,
 	}
 
 	if (dev && !of_node_get(dev->of_node)) {
-		dev_info(dev, "sprd_cpufreq: %s not found cpu node\n",
+		dev_info(dev, "xxx_cpufreq: %s not found cpu node\n",
 			__func__);
 		return -ENOENT;
 	}
 
 	if (dev)
 		prop = of_find_property(dev->of_node,
-			"sprd,cpufreq-temp-threshold", NULL);
+			"xxx,cpufreq-temp-threshold", NULL);
 	prop1 = of_find_property(np_cpufreq_data,
-		"sprd,cpufreq-temp-threshold", NULL);
+		"xxx,cpufreq-temp-threshold", NULL);
 	if (!prop && !prop1)
 		return -ENODEV;
 	if (prop && !prop->value)
@@ -412,7 +412,7 @@ static int temp_binning_get(struct device *dev,
 static int dev_pm_opp_of_add_table_binning(int cluster,
 	struct device *dev,
 	struct device_node *np_cpufreq_data,
-	struct sprd_cpufreq_driver_data *cpufreq_data)
+	struct xxx_cpufreq_driver_data *cpufreq_data)
 {
 	struct device_node *cpu_np = NULL;
 	struct device_node *np = NULL, *np1 = NULL;
@@ -436,14 +436,14 @@ static int dev_pm_opp_of_add_table_binning(int cluster,
 	if (dev && np_cpufreq_data == NULL) {
 		cpu_np = of_node_get(dev->of_node);
 		if (!cpu_np) {
-			dev_err(dev, "sprd_cpufreq: failed to find cpu node\n");
+			dev_err(dev, "xxx_cpufreq: failed to find cpu node\n");
 			return -ENOENT;
 		}
 
 		np = of_parse_phandle(cpu_np, "cpufreq-data", 0);
 		np1 = of_parse_phandle(cpu_np, "cpufreq-data-v1", 0);
 		if (!np && !np1) {
-			dev_err(dev, "sprd_cpufreq: failed to find cpufreq-data\n");
+			dev_err(dev, "xxx_cpufreq: failed to find cpufreq-data\n");
 			of_node_put(cpu_np);
 			return -ENOENT;
 		}
@@ -528,7 +528,7 @@ static int dev_pm_opp_of_add_table_binning(int cluster,
 		if (dev)
 			dev_pm_opp_remove(dev, freq);
 		if (dev && dev_pm_opp_add(dev, freq, volt))
-			dev_warn(dev, "sprd_cpufreq:dev_pm Failed to add OPP %ld\n",
+			dev_warn(dev, "xxx_cpufreq:dev_pm Failed to add OPP %ld\n",
 				freq);
 		else {
 			if (freq/1000 > cpufreq_data->temp_max_freq)
@@ -547,9 +547,9 @@ static int dev_pm_opp_of_add_table_binning(int cluster,
 		nr -= 2;
 	}
 
-	if (sprd_cpufreqhw_probed(cluster)) {
+	if (xxx_cpufreqhw_probed(cluster)) {
 		while (count-- > 0)
-			sprd_cpufreqhw_opp_add(cluster,
+			xxx_cpufreqhw_opp_add(cluster,
 				cpufreq_data->freqvolt[count].freq,
 				cpufreq_data->freqvolt[count].volt,
 				cpufreq_data->freqvolts - 1 - count);
@@ -558,7 +558,7 @@ static int dev_pm_opp_of_add_table_binning(int cluster,
 	return 0;
 }
 
-static int sprd_verify_opp_with_regulator(struct device *cpu_dev,
+static int xxx_verify_opp_with_regulator(struct device *cpu_dev,
 		struct regulator *cpu_reg, unsigned int volt_tol)
 {
 	unsigned long opp_freq = 0;
@@ -600,7 +600,7 @@ static int sprd_verify_opp_with_regulator(struct device *cpu_dev,
 }
 
 /**
- * sprd_cpufreq_update_opp() - returns the max freq of a cpu
+ * xxx_cpufreq_update_opp() - returns the max freq of a cpu
  * and update dvfs table by temp_now
  * @cpu: which cpu you want to update dvfs table
  * @temp_now: current temperature on this cpu, mini-degree.
@@ -610,10 +610,10 @@ static int sprd_verify_opp_with_regulator(struct device *cpu_dev,
  * 2.succeed to update dvfs table
  * then return max freq(KHZ) of this cluster
  */
-unsigned int sprd_cpufreq_update_opp(int cpu, int temp_now)
+unsigned int xxx_cpufreq_update_opp(int cpu, int temp_now)
 {
 	unsigned int max_freq = 0;
-	struct sprd_cpufreq_driver_data *c;
+	struct xxx_cpufreq_driver_data *c;
 	int cluster;
 
 	temp_now = temp_now/1000;
@@ -657,9 +657,9 @@ unsigned int sprd_cpufreq_update_opp(int cpu, int temp_now)
 
 	return max_freq;
 }
-EXPORT_SYMBOL_GPL(sprd_cpufreq_update_opp);
+EXPORT_SYMBOL_GPL(xxx_cpufreq_update_opp);
 
-static int sprd_cpufreq_set_clock(struct sprd_cpufreq_driver_data *c,
+static int xxx_cpufreq_set_clock(struct xxx_cpufreq_driver_data *c,
 						unsigned long freq)
 {
 	struct clk *clk_low_freq_p;
@@ -700,7 +700,7 @@ static int sprd_cpufreq_set_clock(struct sprd_cpufreq_driver_data *c,
 	return 0;
 }
 
-static int sprd_cpufreq_set_clock_v1(struct sprd_cpufreq_driver_data *c,
+static int xxx_cpufreq_set_clock_v1(struct xxx_cpufreq_driver_data *c,
 						unsigned long freq)
 {
 	int ret = 0, i;
@@ -772,7 +772,7 @@ exit_err:
 }
 
 // 共用regulator和共用锁是一样的设计模式
-static struct regulator *sprd_volt_share_reg(struct sprd_cpufreq_driver_data *c)
+static struct regulator *xxx_volt_share_reg(struct xxx_cpufreq_driver_data *c)
 {
 	int cluster;
 	struct regulator *reg = NULL;
@@ -809,7 +809,7 @@ static struct regulator *sprd_volt_share_reg(struct sprd_cpufreq_driver_data *c)
 }
 
 // 感觉好像是一个cluster用一把锁
-static struct mutex *sprd_volt_share_lock(struct sprd_cpufreq_driver_data *c)
+static struct mutex *xxx_volt_share_lock(struct xxx_cpufreq_driver_data *c)
 {
 	int cluster;
 	struct mutex *volt_lock = NULL;
@@ -845,7 +845,7 @@ static struct mutex *sprd_volt_share_lock(struct sprd_cpufreq_driver_data *c)
 	return volt_lock;
 }
 
-static unsigned int sprd_volt_tol_min(struct sprd_cpufreq_driver_data *c,
+static unsigned int xxx_volt_tol_min(struct xxx_cpufreq_driver_data *c,
 	bool online)
 {
 	unsigned int cluster, volt_tol_min = 0;
@@ -873,7 +873,7 @@ static unsigned int sprd_volt_tol_min(struct sprd_cpufreq_driver_data *c,
 	return volt_tol_min;
 }
 /**
- * sprd_volt_req_max()  - get volt_req_max
+ * xxx_volt_req_max()  - get volt_req_max
  * @c:        cluster
  * @volt_max_aim: aimed max between *volt_max_p
  *	and max volt of online or all clusters.
@@ -881,7 +881,7 @@ static unsigned int sprd_volt_tol_min(struct sprd_cpufreq_driver_data *c,
  * @except_self: 0-just search all clusters; 1-just search online clusters.
  * @return: current max volt of online/all clusters.
  */
-static unsigned long sprd_volt_req_max(struct sprd_cpufreq_driver_data *c,
+static unsigned long xxx_volt_req_max(struct xxx_cpufreq_driver_data *c,
 	unsigned long *volt_max_aim, bool online, bool except_self)
 {
 	int cluster;
@@ -914,8 +914,8 @@ static unsigned long sprd_volt_req_max(struct sprd_cpufreq_driver_data *c,
 	return ret;
 }
 
-static int sprd_freq_sync_by_volt(
-	struct sprd_cpufreq_driver_data *c,
+static int xxx_freq_sync_by_volt(
+	struct xxx_cpufreq_driver_data *c,
 	unsigned long volt)
 {
 	int i = 0, ret = -ENODEV;
@@ -927,7 +927,7 @@ static int sprd_freq_sync_by_volt(
 		i++;
 	}
 	if (i < c->freqvolts) {
-		ret = sprd_cpufreq_set_clock_v1(c, c->freqvolt[i].freq);
+		ret = xxx_cpufreq_set_clock_v1(c, c->freqvolt[i].freq);
 		if (!ret)
 			c->volt_req = c->freqvolt[i].volt;
 	} else
@@ -936,8 +936,8 @@ static int sprd_freq_sync_by_volt(
 	return ret;
 }
 
-static int sprd_volt_share_slaves_notify(
-	struct sprd_cpufreq_driver_data *host,
+static int xxx_volt_share_slaves_notify(
+	struct xxx_cpufreq_driver_data *host,
 	unsigned long volt)
 {
 	unsigned int cluster;
@@ -951,7 +951,7 @@ static int sprd_volt_share_slaves_notify(
 			if (cpufreq_datas[cluster] != NULL &&
 			cpufreq_datas[cluster]->online &&
 			cpufreq_datas[cluster]->volt_share_hosts_bits) {
-				ret = sprd_freq_sync_by_volt(
+				ret = xxx_freq_sync_by_volt(
 					cpufreq_datas[cluster], volt);
 				if (ret)
 					goto EXIT_ERR;
@@ -964,11 +964,11 @@ EXIT_ERR:
 	return ret;
 }
 /**
- * sprd_freq_sync_slaves_notify()  - sprd_freq_sync_slaves_notify
+ * xxx_freq_sync_slaves_notify()  - xxx_freq_sync_slaves_notify
  * @idx:        0 points to min freq, ascending order
  */
-static int sprd_freq_sync_slaves_notify(
-	struct sprd_cpufreq_driver_data *host,
+static int xxx_freq_sync_slaves_notify(
+	struct xxx_cpufreq_driver_data *host,
 	const unsigned int idx, bool force)
 {
 	unsigned int cluster;
@@ -984,13 +984,13 @@ static int sprd_freq_sync_slaves_notify(
 			if (cpufreq_datas[cluster] != NULL &&
 				cpufreq_datas[cluster]->online &&
 				cpufreq_datas[cluster]->freq_sync_hosts_bits) {
-				if (sprd_cpufreqhw_probed(
+				if (xxx_cpufreqhw_probed(
 					cpufreq_datas[cluster]->cluster))
-					ret = sprd_cpufreqhw_set_target(
+					ret = xxx_cpufreqhw_set_target(
 					    cpufreq_datas[cluster]->cluster,
 					    idx);
 				else
-					ret = sprd_cpufreq_set_target(
+					ret = xxx_cpufreq_set_target(
 						cpufreq_datas[cluster],
 						idx, force);
 				if (ret)
@@ -1004,11 +1004,11 @@ EXIT_ERR:
 	return ret;
 }
 /**
- * sprd_cpufreq_set_target()  - cpufreq_set_target
+ * xxx_cpufreq_set_target()  - cpufreq_set_target
  * @idx:        0 points to min freq, ascending order
  */
-static int sprd_cpufreq_set_target(
-	struct sprd_cpufreq_driver_data *cpufreq_data, unsigned int idx, bool force)
+static int xxx_cpufreq_set_target(
+	struct xxx_cpufreq_driver_data *cpufreq_data, unsigned int idx, bool force)
 {
 	struct dev_pm_opp *opp;
 	unsigned long volt_new = 0, volt_new_req = 0, volt_old = 0;
@@ -1089,7 +1089,7 @@ static int sprd_cpufreq_set_target(
 		opp_freq_hz / 1000, volt_new, volt_tol);
 
 	volt_new_req = volt_new;
-	sprd_volt_req_max(cpufreq_data, &volt_new, true, true);
+	xxx_volt_req_max(cpufreq_data, &volt_new, true, true);
 	if (!volt_new) {
 		goto EXIT_ERR;
 		P_DBG("fail to get volt_new=0\n");
@@ -1099,7 +1099,7 @@ static int sprd_cpufreq_set_target(
 		new_freq_hz / 1000000, volt_new ? volt_new / 1000 : -1);
 
 	if (volt_new < volt_old) {
-		ret  = sprd_volt_share_slaves_notify(cpufreq_data, volt_new);
+		ret  = xxx_volt_share_slaves_notify(cpufreq_data, volt_new);
 		if (ret)
 			goto EXIT_ERR;
 	}
@@ -1115,7 +1115,7 @@ static int sprd_cpufreq_set_target(
 		}
 	}
 	// 先降频再降压
-	ret = sprd_cpufreq_set_clock(cpufreq_data, new_freq_hz);
+	ret = xxx_cpufreq_set_clock(cpufreq_data, new_freq_hz);
 	if (ret) {
 		P_ERR("failed to set clock %luMhz rate: %d\n", new_freq_hz / 1000000, ret);
 		if ((volt_old > 0) && (new_freq_hz > old_freq_hz)) {
@@ -1133,13 +1133,13 @@ static int sprd_cpufreq_set_target(
 		if (ret) {
 			// 降压失败之后恢复原来的频率
 			P_WARN("failed to scale volt %lu %u down: %d\n", volt_new, volt_tol, ret);
-			ret = sprd_cpufreq_set_clock(cpufreq_data, old_freq_hz);
+			ret = xxx_cpufreq_set_clock(cpufreq_data, old_freq_hz);
 			goto EXIT_ERR;
 		}
 	}
 
 	if (volt_new >= volt_old) {
-		ret  = sprd_volt_share_slaves_notify(
+		ret  = xxx_volt_share_slaves_notify(
 			cpufreq_data,
 			volt_new);
 	}
@@ -1155,7 +1155,7 @@ static int sprd_cpufreq_set_target(
 	mutex_unlock(cpufreq_data->volt_lock);
 	return ret;
 EXIT_ERR:
-	sprd_volt_share_slaves_notify(
+	xxx_volt_share_slaves_notify(
 		cpufreq_data,
 		volt_old);
 
@@ -1163,18 +1163,18 @@ EXIT_ERR:
 	return ret;
 }
 /**
- * sprd_cpufreq_set_target_index()  - cpufreq_set_target
+ * xxx_cpufreq_set_target_index()  - cpufreq_set_target
  * @idx:        0 points to min freq, ascending order
  */
-static int sprd_cpufreq_set_target_index(struct cpufreq_policy *policy,
+static int xxx_cpufreq_set_target_index(struct cpufreq_policy *policy,
 				unsigned int idx)
 {
 	int ret;
 
 	/*never dvfs until boot_done_timestamp*/
 	if (unlikely(boot_done_timestamp &&time_after(jiffies, boot_done_timestamp))) {
-		sprd_cpufreq_set_boost(0);
-		sprd_cpufreq_driver.boost_enabled = false;
+		xxx_cpufreq_set_boost(0);
+		xxx_cpufreq_driver.boost_enabled = false;
 		P_INF("Disables boost it is %lu seconds after boot up\n",SPRD_CPUFREQ_DRV_BOOST_DURATOIN/HZ);
 	}
 
@@ -1187,22 +1187,22 @@ static int sprd_cpufreq_set_target_index(struct cpufreq_policy *policy,
 			ret = 0;
 			goto EXIT;
 		} else {
-			sprd_cpufreq_set_boost(0);
-			sprd_cpufreq_driver.boost_enabled = false;
+			xxx_cpufreq_set_boost(0);
+			xxx_cpufreq_driver.boost_enabled = false;
 			P_INF("Disables boost due to policy max(%d<%d)\n",
 				policy->max, policy->cpuinfo.max_freq);
 		}
 	}
 
-	if (sprd_cpufreqhw_probed(topology_physical_package_id(policy->cpu)))
-		ret = sprd_cpufreqhw_set_target(
+	if (xxx_cpufreqhw_probed(topology_physical_package_id(policy->cpu)))
+		ret = xxx_cpufreqhw_set_target(
 			topology_physical_package_id(policy->cpu),
 			idx);
 	else
-		ret = sprd_cpufreq_set_target(policy->driver_data, idx, false);
+		ret = xxx_cpufreq_set_target(policy->driver_data, idx, false);
 
 	if (!ret)
-		ret = sprd_freq_sync_slaves_notify(policy->driver_data,
+		ret = xxx_freq_sync_slaves_notify(policy->driver_data,
 			idx,
 			false);
 
@@ -1210,11 +1210,11 @@ EXIT:
 	return ret;
 }
 
-static int sprd_cpufreq_init_slaves(struct device_node *np_host)
+static int xxx_cpufreq_init_slaves(struct device_node *np_host)
 {
 	int ret = 0, i, ic;
 	struct device_node *np;
-	struct sprd_cpufreq_driver_data *c;
+	struct xxx_cpufreq_driver_data *c;
 	unsigned int cluster;
 	char coreclk[15] = "core*_clk";
 
@@ -1327,14 +1327,14 @@ static int sprd_cpufreq_init_slaves(struct device_node *np_host)
 		of_property_read_u32(np, "freq-sync-hosts-bits", &c->freq_sync_hosts_bits);
 		of_property_read_u32(np, "freq-sync-slaves-bits", &c->freq_sync_slaves_bits);
 
-		c->volt_lock = sprd_volt_share_lock(c);
+		c->volt_lock = xxx_volt_share_lock(c);
 		if (c->volt_lock == NULL) {
 			P_INF("slave index %d can find host volt_lock!\n", i);
 			ret = -ENOMEM;
 			goto free_clk;
 		}
 
-		c->reg = sprd_volt_share_reg(c);
+		c->reg = xxx_volt_share_reg(c);
 		if (c->reg == NULL ||
 		IS_ERR(c->reg)) {
 			P_ERR("failed to get regulator, %ld\n",
@@ -1353,8 +1353,8 @@ static int sprd_cpufreq_init_slaves(struct device_node *np_host)
 
 		of_node_put(np);
 
-		if (sprd_cpufreqhw_probed(c->cluster))
-			sprd_cpufreqhw_enable(c->cluster, true);
+		if (xxx_cpufreqhw_probed(c->cluster))
+			xxx_cpufreqhw_enable(c->cluster, true);
 
 		c->online = 1;
 		cpufreq_datas[cluster] = c;
@@ -1425,7 +1425,7 @@ free_np:
 	return ret;
 }
 
-static int sprd_cpufreq_init(struct cpufreq_policy *policy)
+static int xxx_cpufreq_init(struct cpufreq_policy *policy)
 {
 	struct dev_pm_opp *opp;
 	
@@ -1440,7 +1440,7 @@ static int sprd_cpufreq_init(struct cpufreq_policy *policy)
 	struct regulator *cpu_reg = NULL;
 	struct clk *cpu_clk;
 	
-	struct sprd_cpufreq_driver_data *c;
+	struct xxx_cpufreq_driver_data *c;
 	
 	unsigned int volt_tol = 0;
 	unsigned int transition_latency = CPUFREQ_ETERNAL;
@@ -1491,9 +1491,9 @@ static int sprd_cpufreq_init(struct cpufreq_policy *policy)
 		np = np1;
 	/******************************这里和probe的函数是一样的****************************************/
 
-	if (sprd_cpufreq_data(cpu)){
+	if (xxx_cpufreq_data(cpu)){
 		// 在probe的时候已经init了四个数组大小的结构体，所以不用kzalloc
-		c = sprd_cpufreq_data(cpu);
+		c = xxx_cpufreq_data(cpu);
 	}else {
 		c = kzalloc(sizeof(*c), GFP_KERNEL);
 		if (!c) {
@@ -1520,7 +1520,7 @@ static int sprd_cpufreq_init(struct cpufreq_policy *policy)
 		c->volt_share_slaves_bits);
 
 	if (!c->volt_lock) {
-		c->volt_lock = sprd_volt_share_lock(c);//这里已经init了这个lock
+		c->volt_lock = xxx_volt_share_lock(c);//这里已经init了这个lock
 		if (!c->volt_lock) {
 			c->volt_lock = kzalloc(sizeof(struct mutex), GFP_KERNEL);
 			if (!c->volt_lock) {
@@ -1575,7 +1575,7 @@ static int sprd_cpufreq_init(struct cpufreq_policy *policy)
 	P_DBG("value of transition_latency %u, voltage_tolerance %u\n",
 			transition_latency, volt_tol);
 
-	cpu_reg = sprd_volt_share_reg(c);
+	cpu_reg = xxx_volt_share_reg(c);
 	if (cpu_reg == NULL)
 		cpu_reg = devm_regulator_get(cpu_dev, CORE_SUPPLY);
 	if (cpu_reg == NULL || IS_ERR(cpu_reg)) {
@@ -1596,7 +1596,7 @@ static int sprd_cpufreq_init(struct cpufreq_policy *policy)
 
 	if (cpu_reg != NULL && !IS_ERR(cpu_reg)) {
 		P_DBG("going to verify opp with regulator\n");
-		ret = sprd_verify_opp_with_regulator(cpu_dev,
+		ret = xxx_verify_opp_with_regulator(cpu_dev,
 				cpu_reg, volt_tol);
 		if (ret > 0)
 			transition_latency += ret * 1000;
@@ -1655,7 +1655,7 @@ static int sprd_cpufreq_init(struct cpufreq_policy *policy)
 		P_DBG("cpu%d got new cpufreq_data\n", cpu);
 	}
 
-	ret = sprd_cpufreq_init_slaves(np);
+	ret = xxx_cpufreq_init_slaves(np);
 	if (ret)
 		goto free_table;
 
@@ -1664,8 +1664,8 @@ static int sprd_cpufreq_init(struct cpufreq_policy *policy)
 	policy->driver_data = c;
 	policy->clk = cpu_clk;
 	policy->suspend_freq = freq_table[0].frequency;
-	if (sprd_cpufreqhw_probed(c->cluster))
-		policy->cur = sprd_cpufreqhw_get(c->cluster);
+	if (xxx_cpufreqhw_probed(c->cluster))
+		policy->cur = xxx_cpufreqhw_get(c->cluster);
 	else
 		policy->cur = clk_get_rate(cpu_clk) / 1000;
 	
@@ -1681,11 +1681,11 @@ static int sprd_cpufreq_init(struct cpufreq_policy *policy)
 	rcu_read_unlock();
 
 
-	if (sprd_cpufreqhw_probed(c->cluster)) {
-		sprd_cpufreqhw_enable(c->cluster, true);
+	if (xxx_cpufreqhw_probed(c->cluster)) {
+		xxx_cpufreqhw_enable(c->cluster, true);
 	} else {
 		if (freq_Hz != policy->cur*1000)
-			sprd_cpufreq_set_target(c, 0, true);
+			xxx_cpufreq_set_target(c, 0, true);
 	}
 
 	P_INF("init cpu%d is ok, freq=%ld, freq_req=%ld, volt_req=%ld\n",
@@ -1724,7 +1724,7 @@ free_mem:
 		kfree(c->volt_lock);
 	}
 	kfree(c);
-	sprd_cpufreq_data(cpu) = NULL;
+	xxx_cpufreq_data(cpu) = NULL;
 free_np:
 	if (np)
 		of_node_put(np);
@@ -1735,9 +1735,9 @@ free_np:
 	return ret;
 }
 
-static int sprd_cpufreq_exit(struct cpufreq_policy *policy)
+static int xxx_cpufreq_exit(struct cpufreq_policy *policy)
 {
-	struct sprd_cpufreq_driver_data *c;
+	struct xxx_cpufreq_driver_data *c;
 	int ic;
 
 	if (!policy)
@@ -1754,7 +1754,7 @@ static int sprd_cpufreq_exit(struct cpufreq_policy *policy)
 		dev_pm_opp_free_cpufreq_table(c->cpu_dev,
 			&policy->freq_table);
 
-	sprd_cpufreqhw_enable(topology_physical_package_id(policy->cpu), false);
+	xxx_cpufreqhw_enable(topology_physical_package_id(policy->cpu), false);
 
 	if (!IS_ERR(policy->clk)) {
 		clk_put(policy->clk);
@@ -1782,21 +1782,21 @@ static int sprd_cpufreq_exit(struct cpufreq_policy *policy)
 	return 0;
 }
 
-static int sprd_cpufreq_table_verify(struct cpufreq_policy *policy)
+static int xxx_cpufreq_table_verify(struct cpufreq_policy *policy)
 {
 	return cpufreq_generic_frequency_table_verify(policy);
 }
 
 
-static unsigned int sprd_cpufreq_get(unsigned int cpu)
+static unsigned int xxx_cpufreq_get(unsigned int cpu)
 {
-	if (sprd_cpufreqhw_probed(topology_physical_package_id(cpu)))
-		return sprd_cpufreqhw_get(topology_physical_package_id(cpu));
+	if (xxx_cpufreqhw_probed(topology_physical_package_id(cpu)))
+		return xxx_cpufreqhw_get(topology_physical_package_id(cpu));
 	else
 		return cpufreq_generic_get(cpu);
 }
 
-static int sprd_cpufreq_suspend(struct cpufreq_policy *policy)
+static int xxx_cpufreq_suspend(struct cpufreq_policy *policy)
 {
 	/*do not change freq in userpace mode*/
 	if (policy && !strcmp(policy->governor->name, "userspace")) {
@@ -1808,7 +1808,7 @@ static int sprd_cpufreq_suspend(struct cpufreq_policy *policy)
 	return cpufreq_generic_suspend(policy);
 }
 
-static int sprd_cpufreq_resume(struct cpufreq_policy *policy)
+static int xxx_cpufreq_resume(struct cpufreq_policy *policy)
 {
 	/*do not change freq in userpace mode*/
 	if (policy && !strcmp(policy->governor->name, "userspace")) {
@@ -1822,13 +1822,13 @@ static int sprd_cpufreq_resume(struct cpufreq_policy *policy)
 }
 
 /**
- * sprd_cpufreq_set_boost: set cpufreq driver to be boost mode.
+ * xxx_cpufreq_set_boost: set cpufreq driver to be boost mode.
  *
  * @state: 0->disable boost mode;1->enable boost mode;
  *
  * Return: zero on success, otherwise non-zero on failure.
  */
-static int sprd_cpufreq_set_boost(int state)
+static int xxx_cpufreq_set_boost(int state)
 {
 	/*
 	  *if (boost_mode_flag != state && state) {
@@ -1843,40 +1843,40 @@ static int sprd_cpufreq_set_boost(int state)
 	  */
 	boot_done_timestamp = 0;
 	boost_mode_flag = state;
-	P_INF("sprd_cpufreq_set_boost=%d\n", boost_mode_flag);
+	P_INF("xxx_cpufreq_set_boost=%d\n", boost_mode_flag);
 
 	return 0;
 }
 
-static struct cpufreq_driver sprd_cpufreq_driver = {
-	.name = "sprd-cpufreq",
+static struct cpufreq_driver xxx_cpufreq_driver = {
+	.name = "xxx-cpufreq",
 	.flags = CPUFREQ_STICKY	///* driver isn't removed even if all ->init() calls failed */
 			| CPUFREQ_NEED_INITIAL_FREQ_CHECK //
 			| CPUFREQ_HAVE_GOVERNOR_PER_POLICY,//表示不同的CPU，有不同的频率控制方式
-	.init = sprd_cpufreq_init,
-	.exit = sprd_cpufreq_exit,
-	.verify = sprd_cpufreq_table_verify,
-	.target_index = sprd_cpufreq_set_target_index,
-	.get = sprd_cpufreq_get,
-	.suspend = sprd_cpufreq_suspend,
-	.resume = sprd_cpufreq_resume,
+	.init = xxx_cpufreq_init,
+	.exit = xxx_cpufreq_exit,
+	.verify = xxx_cpufreq_table_verify,
+	.target_index = xxx_cpufreq_set_target_index,
+	.get = xxx_cpufreq_get,
+	.suspend = xxx_cpufreq_suspend,
+	.resume = xxx_cpufreq_resume,
 	.attr = cpufreq_generic_attr,
 	
 	/* platform specific boost support code */
 	.boost_supported = true,
 	.boost_enabled = true,
-	.set_boost = sprd_cpufreq_set_boost,
+	.set_boost = xxx_cpufreq_set_boost,
 };
-static int sprd_cpufreq_cpu_callback(struct notifier_block *nfb,
+static int xxx_cpufreq_cpu_callback(struct notifier_block *nfb,
 	unsigned long action, void *hcpu)
 {
 	unsigned int cpu = (unsigned long)hcpu;
 	unsigned int olcpu = 0;
 	unsigned int volt_tol_min = 0, index = 0;
 	unsigned long volt_max_online = 0;
-	struct sprd_cpufreq_driver_data *c;
+	struct xxx_cpufreq_driver_data *c;
 
-	c = sprd_cpufreq_data(cpu);
+	c = xxx_cpufreq_data(cpu);
 
 	if (c == NULL || (c && c->volt_share_masters_bits == 0))
 		return NOTIFY_OK;
@@ -1893,12 +1893,12 @@ static int sprd_cpufreq_cpu_callback(struct notifier_block *nfb,
 		P_INF("BIG CLUSTER ON: vol to old_vol of cpu %u\n", cpu);
 
 		/*For HW DVFS, no need reovering volt*/
-		if (sprd_cpufreqhw_probed(c->cluster))
+		if (xxx_cpufreqhw_probed(c->cluster))
 			break;
 
 		mutex_lock(c->volt_lock);
-		volt_tol_min = sprd_volt_tol_min(c, true);
-		sprd_volt_req_max(c, &volt_max_online, true, true);
+		volt_tol_min = xxx_volt_tol_min(c, true);
+		xxx_volt_req_max(c, &volt_max_online, true, true);
 
 		if (c->volt_req > volt_max_online) {
 			if (regulator_set_voltage_tol(c->reg,
@@ -1907,8 +1907,8 @@ static int sprd_cpufreq_cpu_callback(struct notifier_block *nfb,
 				P_ERR("fail to set voltage %lu\n",
 					c->volt_req);
 			else
-				sprd_volt_share_slaves_notify(
-					sprd_cpufreq_data(cpu),
+				xxx_volt_share_slaves_notify(
+					xxx_cpufreq_data(cpu),
 					c->volt_req);
 		}
 		c->online = 1;
@@ -1923,7 +1923,7 @@ static int sprd_cpufreq_cpu_callback(struct notifier_block *nfb,
 			if (c->volt_req >= c->freqvolt[index].volt)
 				break;
 		if (index < c->freqvolts)
-			sprd_freq_sync_slaves_notify(c,
+			xxx_freq_sync_slaves_notify(c,
 				c->freqvolts - 1 - index, true);
 		break;
 	case CPU_UP_CANCELED:
@@ -1937,19 +1937,19 @@ static int sprd_cpufreq_cpu_callback(struct notifier_block *nfb,
 		 * For HW DVFS, set master core lowest freq& low volt
 		 *   notify slaves set min freq
 		 */
-		sprd_freq_sync_slaves_notify(c, 0, true);
+		xxx_freq_sync_slaves_notify(c, 0, true);
 
 		break;
 	}
 	return NOTIFY_OK;
 }
 
-static struct notifier_block __refdata sprd_cpufreq_cpu_notifier = {
-	.notifier_call = sprd_cpufreq_cpu_callback,
+static struct notifier_block __refdata xxx_cpufreq_cpu_notifier = {
+	.notifier_call = xxx_cpufreq_cpu_callback,
 };
 
 // clear it
-static int  sprd_cpufreq_probe(struct platform_device *pdev)
+static int  xxx_cpufreq_probe(struct platform_device *pdev)
 {
 	
 	struct device *cpu_dev = NULL;
@@ -2049,50 +2049,50 @@ put_np:
 
 	P_INF("going to register cpufreq driver\n");
 	// 调用cpufreq core的cpufreq_register_driver函数
-	ret = cpufreq_register_driver(&sprd_cpufreq_driver);
+	ret = cpufreq_register_driver(&xxx_cpufreq_driver);
 	if (ret)
 		P_INF("cpufreq driver register failed %d\n", ret);
 	else
 		P_INF("cpufreq driver register succcess\n");
 	
 	// 这个实际上没有必要，因为在cpufreq_register_driver里也注册了相同的notifier回调函数
-	register_hotcpu_notifier(&sprd_cpufreq_cpu_notifier);
+	register_hotcpu_notifier(&xxx_cpufreq_cpu_notifier);
 
 	return ret;
 }
 
-static int sprd_cpufreq_remove(struct platform_device *pdev)
+static int xxx_cpufreq_remove(struct platform_device *pdev)
 {
-	return cpufreq_unregister_driver(&sprd_cpufreq_driver);
+	return cpufreq_unregister_driver(&xxx_cpufreq_driver);
 }
 
-static struct platform_driver sprd_cpufreq_platdrv = {
+static struct platform_driver xxx_cpufreq_platdrv = {
 	.driver = {
 	///sys/devices/system/cpu/cpu0/cpufreq # cat scaling_driver
-		.name	= "sprd-cpufreq",
+		.name	= "xxx-cpufreq",
 		.owner	= THIS_MODULE,
 	},
-	.probe		= sprd_cpufreq_probe,
-	.remove		= sprd_cpufreq_remove,
+	.probe		= xxx_cpufreq_probe,
+	.remove		= xxx_cpufreq_remove,
 };
 		
 //module_platform_driver 是一个宏，定义的是平台设备的注册和注销
 // platform_driver_register和platform_driver_unregister
-module_platform_driver(sprd_cpufreq_platdrv);
+module_platform_driver(xxx_cpufreq_platdrv);
 
 /* If required, we can move device registration code in other file */
 // register device only contain name
-static struct platform_device sprd_cpufreq_pdev = {
-	.name = "sprd-cpufreq",
+static struct platform_device xxx_cpufreq_pdev = {
+	.name = "xxx-cpufreq",
 };
 
-static int  __init sprd_cpufreq_init_pdev(void)
+static int  __init xxx_cpufreq_init_pdev(void)
 {
-	return platform_device_register(&sprd_cpufreq_pdev);
+	return platform_device_register(&xxx_cpufreq_pdev);
 }
 
 // 设备初始化在init表里面排第六位
-device_initcall(sprd_cpufreq_init_pdev);
+device_initcall(xxx_cpufreq_init_pdev);
 
-MODULE_DESCRIPTION("sprd cpufreq driver");
+MODULE_DESCRIPTION("xxx cpufreq driver");
 MODULE_LICENSE("GPL");
