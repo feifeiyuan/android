@@ -1,0 +1,103 @@
+diff --git a/domain.te b/domain.te
+index 939c051..5136b69 100755
+--- a/domain.te
++++ b/domain.te
+@@ -234,8 +234,7 @@ neverallow { domain -init } kernel:security setsecparam;
+ neverallow { domain -init -system_server -ueventd } hw_random_device:chr_file *;
+ 
+ # Ensure that all entrypoint executables are in exec_type or postinstall_file.
+-neverallow * { file_type -exec_type -postinstall_file }:file entrypoint;
+-
++neverallow { domain -cpu_power } { file_type -exec_type -postinstall_file }:file entrypoint;
+ # Ensure that nothing in userspace can access /dev/mem or /dev/kmem
+ neverallow { domain -kernel -ueventd -init } kmem_device:chr_file *;
+ neverallow * kmem_device:chr_file ~{ create relabelto unlink setattr };
+@@ -319,7 +318,7 @@ neverallow { domain -init } properties_device:file { no_w_file_perms no_x_file_p
+ neverallow { domain -init } properties_serial:file { no_w_file_perms no_x_file_perms };
+ 
+ # Only recovery should be doing writes to /system
+-neverallow { domain -recovery } { system_file exec_type }:dir_file_class_set
++neverallow { domain -recovery -cpu_power} { system_file exec_type }:dir_file_class_set
+     { create write setattr relabelfrom append unlink link rename };
+ neverallow { domain -recovery -kernel } { system_file exec_type }:dir_file_class_set relabelto;
+ 
+@@ -426,8 +425,7 @@ neverallow * { file_type fs_type dev_type }:{ lnk_file fifo_file sock_file } mou
+ # Nobody should be able to execute su on user builds.
+ # On userdebug/eng builds, only dumpstate, shell, and
+ # su itself execute su.
+-neverallow { domain userdebug_or_eng(`-dumpstate -shell -su') } su_exec:file no_x_file_perms;
+-
++neverallow { domain userdebug_or_eng(`-dumpstate -shell -su -cpu_power') } su_exec:file no_x_file_perms;
+ # Do not allow the introduction of new execmod rules. Text relocations
+ # and modification of executable pages are unsafe.
+ # The only exceptions are for NDK text relocations associated with
+@@ -470,6 +468,7 @@ neverallow ~domain domain:process { transition dyntransition };
+ #
+ neverallow {
+   domain
++  -cpu_power
+   -system_server
+   -system_app
+   -init
+@@ -570,7 +569,7 @@ neverallow * domain:file { execute execute_no_trans entrypoint };
+ # Instead, if access to part of debugfs is desired, it should have a
+ # more specific label.
+ # TODO: fix system_server and dumpstate
+-neverallow { domain -init -system_server -cmd_services -dumpstate userdebug_or_eng(`-ylog') } debugfs:file no_rw_file_perms;
++neverallow { domain -cpu_power -init -system_server -cmd_services -dumpstate userdebug_or_eng(`-ylog') } debugfs:file no_rw_file_perms;
+ 
+ neverallow {
+   domain
+diff --git a/file.te b/file.te
+index ff9d567..02874a3 100644
+--- a/file.te
++++ b/file.te
+@@ -31,6 +31,12 @@ type sysfs_nfc_power_writable, fs_type, sysfs_type, mlstrustedobject;
+ type sysfs_wake_lock, fs_type, sysfs_type;
+ type sysfs_mac_address, fs_type, sysfs_type;
+ type sysfs_usb, sysfs_type, file_type, mlstrustedobject;
++
++type cluster0_power_file, sysfs_type, file_type;
++type cluster1_power_file, sysfs_type, file_type;
++type cluster2_power_file, sysfs_type, file_type;
++type fcm_power_file, sysfs_type, file_type;
++
+ type configfs, fs_type;
+ # /sys/devices/system/cpu
+ type sysfs_devices_system_cpu, fs_type, sysfs_type;
+diff --git a/file_contexts b/file_contexts
+index e78f8b8..edd5373 100644
+--- a/file_contexts
++++ b/file_contexts
+@@ -390,6 +390,10 @@
+ /mnt/asec/[^/]+/[^/]+\.zip  u:object_r:asec_public_file:s0
+ /mnt/asec/[^/]+/lib(/.*)?   u:object_r:asec_public_file:s0
+ /data/app-asec(/.*)?        u:object_r:asec_image_file:s0
++/sys/cpu_power/cluster0_power u:object_r:cluster0_power_file:s0
++/sys/cpu_power/cluster1_power u:object_r:cluster1_power_file:s0
++/sys/cpu_power/cluster2_power u:object_r:cluster2_power_file:s0
++/sys/cpu_power/fcm_power u:object_r:fcm_power_file:s0
+ 
+ #############################
+ # external storage
+@@ -397,3 +401,4 @@
+ /mnt/user(/.*)?             u:object_r:mnt_user_file:s0
+ /mnt/runtime(/.*)?          u:object_r:storage_file:s0
+ /storage(/.*)?              u:object_r:storage_file:s0
++/system/bin/cpu_power_cal      u:object_r:cpu_power_exec:s0
+diff --git a/shell.te b/shell.te
+index 056eeb6..bd0ed0d 100644
+--- a/shell.te
++++ b/shell.te
+@@ -23,6 +23,11 @@ userdebug_or_eng(`
+ 
+ # Root fs.
+ allow shell rootfs:dir r_dir_perms;
++allow shell cluster0_power_file:file { getattr open write read};
++allow shell cluster1_power_file:file { getattr open write read};
++allow shell cluster2_power_file:file { getattr open write read};
++allow shell fcm_power_file:file { getattr open write read};
++allow shell cpu_power_exec:file {getattr open read};
+ 
+ # read files in /data/anr
+ allow shell anr_data_file:dir r_dir_perms;
